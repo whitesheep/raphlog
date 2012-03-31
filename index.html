@@ -1,0 +1,240 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html>
+	<head>
+		<title>RaphLog</title>
+		
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<style type="text/css">
+			html {
+			    width: 100%;
+			    height: 100%;
+			    margin: 0;
+			}
+			body {
+			    background: #000;
+			    color: #fff;
+			    font: 300 100.1% "Helvetica Neue", Helvetica, "Arial Unicode MS", Arial, sans-serif;
+			    width: 100%;
+			    height: 100%;
+			    margin: 0;
+			}
+			
+			#holder {
+				margin: 0;
+				width: 99%;
+				height: 99%;
+			}
+		</style>
+		<script type='text/javascript' src="js/raphael.js"></script>
+		<script type='text/javascript' src="http://white_sheep.ihteam.net:8081/socket.io/socket.io.js"></script>
+		
+		<script type="text/javascript">
+			var time = 1500;
+
+			Raphael(function () {
+                var r = Raphael("holder");
+                var ping_length = 50;
+                var ping = r.rect(r.width*2/3, r.height/2 - 25, 5, ping_length).attr({stroke: "none", fill: "#666"});
+                var moving = false;
+				var track = [];
+				                 
+                pong = function (id) {
+                    return function () {
+               
+                    	if ( id == 1 ){
+ 	                       	this.remove();
+	                   	} else {
+	                   		ping.attr({fill: this.attr('fill')}).animate({fill: "#666"}, 500);
+	                   		
+	                   		switch (this.data('type') ){
+	                   			
+	                   			case 'ball':
+	                   				this.attr({
+	                   					'stroke': this.attr('fill'),
+	                   					'stroke-width' : this.attr('r')*4,
+		                        		'stroke-linejoin': 'round',
+        		    					'stroke-linecap': 'round',
+                		        		'stroke-opacity' : 0.2 
+	                   				});
+	                   			break;
+	                   			
+	                   			case 'txt_start':
+	                   			break;
+	                   			
+	                   			
+	             				case 'txt_desc':
+	                   				this.show();
+	                   			break;
+	                   			
+	                   			case 'txt_end':
+	                   				this.show();
+	                   			break;
+	                   			
+	                   		}
+                        }
+                    };
+                };
+				
+                pingAnim = function(y, t){
+                	now = new Date().getTime();
+                	if(moving){
+                		track.push([y,t]);
+                	} else {
+                		moving = true;
+                		ping.animate({ y : y, callback: function(){
+                			moving = false;
+                			tmp = track.shift();
+                			tmp_pad = -ping_length/2;
+                			
+                			if ( tmp ){
+                				pingAnim(tmp[0] + tmp_pad, tmp[1])
+                			} else {
+                				pingAnim(r.height/2 + tmp_pad, new Date().getTime()+1000);
+                			}
+                			
+                		}}, t-now);
+                	}
+                }
+                
+                run = function (text_start, text_pong, text_desc, count) {
+               		now = new Date().getTime();
+                	
+                	fill = '#'+((1<<24)*(Math.random()+1)|0).toString(16).substr(1);
+                	
+                	y = Math.floor(Math.random() * (r.height + 2));
+                    
+                    pos = (r.height/(Math.random() * 11))%(r.height/2);
+                    
+                    if ( ( ( Math.random() * 11 ) % 2 ) == 0 ){                   		
+                   		yinit = y+pos;
+                   		yend = y+pos*2;
+                   	} else {
+                   		if ( y - pos < 0 ){
+                   			yinit = y+pos;
+                   			yend = y+pos*2;
+                   		} else {
+                   			yinit = y-pos;
+                   			yend = y-pos*2;
+                   		}
+                   	}
+                    
+                	c = r.set(
+                
+                		r.set(
+                			r.circle(0, y, 5).attr({
+                				opacity: 0.7, 
+                				fill: fill, 
+                				"stroke": 'none',
+                				r: 4*count
+                			}),
+                			r.circle(0, y, 5).attr({
+                				opacity: 0.5, 
+                				fill: fill, 
+                				"stroke": 'none',
+                				r: 5*count
+                			}),
+                			r.circle(0, y, 5).attr({
+                				opacity: 0.3, 
+                				fill: fill, 
+                				"stroke": 'none',
+                				r: 5*count+count
+                			}),
+                			r.circle(0, y, 5).attr({
+                				opacity: 0.1, 
+                				fill: fill, 
+                				"stroke": 'none',
+                				r: 5*count+count*2
+                			}),
+                			r.circle(0, y, 5).attr({
+                				opacity: 0.1, 
+                				fill: fill, 
+                				"stroke": 'none',
+                				r: 5*count+count*4
+                			})
+                		
+                		).data('type', 'ball'),
+                		
+                		r.text(0, y, text_start).attr({
+                			fill: fill, 
+                			'font-size': '15px', 
+                			'text-anchor': 'start'
+                		}).data('type', 'txt_start'),
+                		
+                		r.text(r.width*2/3, yinit, text_pong).attr({
+                			fill: fill, 
+                			'font-size': '15px', 
+                			'text-anchor': 'end'
+                		}).data('type', 'txt_end').hide(),
+                		
+                		r.text(r.width*2/3 + 10, yinit, text_desc).attr({
+                			fill: fill, 
+                			'font-size': '12px', 
+                			'text-anchor': 'start'
+                		}).data('type', 'txt_desc').hide()
+                	);
+                    
+                    pingAnim(yinit, now+time);
+                    
+                    c.stop().animate({
+                        "50%": {cy: yinit, easing: '', callback: pong(0)},
+                        "100%": {cy: yend, opacity: 0, easing: '', callback: pong(1)}
+                    }, time*2).animate({
+                        "50%": {cx: r.width*2/3, easing: ''},
+                        "100%": {cx: 0, easing: ''}
+                    }, time*2);
+                };
+            });
+		
+		</script>
+		
+		<script type="text/javascript">
+			var balls = [];
+			var balls_delay = 200;
+			
+			function parser(data){
+				return /([^ ]+) ([^ ]+) ([^ ]+) \[([^\]]+)\] "([^"]+)" ([^ ]+) ([^ ]+) "([^"]+)" "([^"]+)" "([^"]+)"/.exec(data);
+			}
+			
+			function runPong(t1, t2, t3){
+				now = new Date().getTime();
+				if ( balls[balls.length-1] && 
+					 balls[balls.length-1].time - now < 100 &&
+					 balls[balls.length-1].t1 == t1 &&
+					 balls[balls.length-1].t2 == t2 &&
+					 balls[balls.length-1].t3 == t3 ){
+
+					balls[balls.length-1].i++;
+				} else {
+					balls.push({
+						time: now,
+						t1: t1,
+						t2: t2,
+						t3: t3,
+						i: 1
+					}); 
+				}
+			}
+			
+			setInterval(function(){
+				tmp = balls.slice(0);
+				balls = [];
+				
+				for ( i = 0; i < tmp.length; i++ ) {
+					run(tmp[i].t1, tmp[i].t2, tmp[i].t3, tmp[i].i);
+				}
+			}, balls_delay);
+			
+		</script>
+		
+		<script type="text/javascript">
+			var socket = io.connect('http://white_sheep.ihteam.net:8081');
+			socket.on('log', function (data) {
+				parsed = parser(data);
+				runPong(parsed[1], parsed[6], parsed[5]);
+			});
+		</script>
+	</head>
+	<body>
+		<div id="holder"></div>
+	</body>
+</html>
